@@ -38,7 +38,7 @@ fn main() {
         };
 
         let output: Box<dyn Write> = match &args.output {
-            Some(output) => match File::open(output) {
+            Some(output) => match File::create(&output).or_else(|_| File::open(&output)) {
                 Ok(f) => Box::new(f),
                 Err(e) => {
                     return Err(format!(

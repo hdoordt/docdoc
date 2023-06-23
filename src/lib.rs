@@ -85,7 +85,6 @@ impl<'src> Expr<'src> {
         for m in matches {
             if m.start() > cursor {
                 exprs.push(Expr::Text(&line[cursor..m.start()]));
-                
             }
             let path = &line[m.start() + r#"#[docdoc:path=""#.len()..m.end() - r#""]"#.len()];
             exprs.push(Expr::IncludePath(Path::new(path)));
@@ -100,12 +99,27 @@ impl<'src> Expr<'src> {
     }
 
     fn eval(&self, base_path: &Path) -> Cow<'_, str> {
+        use std::fmt::Write;
         use Expr::*;
         match self {
             Text(t) => Cow::Borrowed(t),
             IncludePath(p) => {
-                let contents = fs::read_to_string(base_path.join(p)).unwrap();
-                Cow::Owned(contents)
+                let base_path = base_path.join(p);
+                let contents = fs::read_to_string(&base_path).unwrap();
+                let mut lines = contents.lines().peekable();
+                let mut rendered = String::new();
+
+                while let Some(line) = lines.next() {
+                    let exprs = Expr::parse(line);
+                    for expr in exprs {
+                        rendered.push_str(&expr.eval(&base_path.parent().unwrap()))
+                    }
+                    if lines.peek().is_some() {
+                        writeln!(rendered).unwrap();
+                    }
+                }
+
+                Cow::Owned(rendered)
             }
         }
     }
