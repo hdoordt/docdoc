@@ -1,5 +1,6 @@
 [package]
 name = "docdoc"
+description = "Simple tool that stiches together a tree of text-based files"
 version = "0.0.1"
 edition = "2021"
 authors = ["Henk Oordt <hd@oordt.dev>"]
