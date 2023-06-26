@@ -13,12 +13,15 @@ use regex::Regex;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+/// Supported file formats
 pub enum Format {
+    /// A MarkDown document
     #[cfg_attr(feature = "clap", value(alias = "md"))]
     Markdown,
 }
 
 impl Format {
+    /// Auto-detect file format based on its extension
     pub fn detect(path: impl AsRef<Path>) -> Option<Self> {
         path.as_ref()
             .extension()
@@ -30,14 +33,19 @@ impl Format {
     }
 }
 
-pub struct DocDoc;
+pub enum DocDoc {}
 
 impl DocDoc {
-    pub fn list_imports(_format: Format, entry_path: PathBuf) -> Result<HashSet<PathBuf>, Error> {
+    /// Traverse the import tree from the entry path, and return a list of all
+    /// paths from which files are imported.
+    pub fn list_imports(
+        _format: Format,
+        entry_path: impl AsRef<Path>,
+    ) -> Result<HashSet<PathBuf>, Error> {
         let file = File::open(&entry_path)?;
         let input = BufReader::new(file);
-        let base_path = entry_path.parent().unwrap().to_owned();
-        let touched_paths = HashSet::from([entry_path]);
+        let base_path = entry_path.as_ref().parent().unwrap().to_owned();
+        let touched_paths = HashSet::from([entry_path.as_ref().to_owned()]);
         let mut all_touched_paths = HashSet::new();
         for line in input.lines() {
             let line = line?;
@@ -50,15 +58,17 @@ impl DocDoc {
         Ok(all_touched_paths)
     }
 
+    /// Traverse the import tree from the entry path, and render all imports
+    /// to the passed [Write].
     pub fn stitch(
         _format: Format,
         mut output: impl Write,
-        entry_path: PathBuf,
+        entry_path: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        let file = File::open(&entry_path)?;
+        let file = File::open(entry_path.as_ref())?;
         let input = BufReader::new(file);
-        let base_path = entry_path.parent().unwrap().to_owned();
-        let touched_paths = HashSet::from([entry_path]);
+        let base_path = entry_path.as_ref().parent().unwrap().to_owned();
+        let touched_paths = HashSet::from([entry_path.as_ref().to_owned()]);
         for line in input.lines() {
             let line = line?;
             let exprs = Expr::parse(&line);
