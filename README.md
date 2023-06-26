@@ -1,13 +1,16 @@
 # DocDoc
 
+[![crates.io](https://img.shields.io/crates/v/docdoc.svg)](https://crates.io/crates/docdoc) [![Documentation](https://docs.rs/docdoc/badge.svg)](https://docs.rs/docdoc)
+
 Simple tool that stiches together a tree of text-based files. Currently only supports markdown.
+
+Why? I couln't find an easy to use and install tool to stich together my markdown files. And because it's fun, of course!
 
 ## Installation
 You'll need Rust and Cargo to build or install this tool.
 You can find installation instructions for Rust and Cargo at <https://rustup.rs/>.
 
 To install the latest release, just run
-
 ```
 cargo install docdoc
 ```
@@ -51,3 +54,10 @@ docdoc -o output.md entry.md
 ```
 
 And done! Open `output.md` to read the contents of the whole paper.
+
+## Features
+
+- [x] Include files from paths
+- [x] Detect and error on cyclic imports
+- [ ] Include from git
+- [ ] [YOUR FEATURE HERE] If you're missing a feature, please open an issue and we'll discuss it.
