@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fs::File,
-    io::{stdout, BufReader, Write},
+    io::{stdout, Write},
     path::PathBuf,
     process::exit,
 };
@@ -21,16 +21,6 @@ struct Args {
 fn main() {
     fn run() -> Result<(), Box<dyn Error>> {
         let args = Args::parse();
-        let entry = match File::open(&args.entry) {
-            Ok(f) => f,
-            Err(e) => {
-                return Err(format!(
-                    "Error opening entry file at {}: {e}",
-                    args.entry.to_string_lossy()
-                )
-                .into());
-            }
-        };
 
         let output: Box<dyn Write> = match &args.output {
             Some(output) => match File::create(&output).or_else(|_| File::open(&output)) {
@@ -51,9 +41,7 @@ fn main() {
             None => return Err("Could not auto-detect entry document format. Please specify it using the `--format` argument".into()),
         };
 
-        let docdoc = DocDoc::new(doc_format, BufReader::new(entry), output, args.entry);
-
-        docdoc.stitch().map_err(Into::into)
+        DocDoc::stitch(doc_format, output, args.entry).map_err(Into::into)
     }
 
     if let Err(e) = run() {

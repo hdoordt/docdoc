@@ -47,7 +47,7 @@ And then `conclusion.md`:
 So yeah, that was it. I had fun!
 ```
 
-Now, lets have DocDoc stitch this together:
+Now let's have DocDoc stitch all this together:
 
 ```
 docdoc -o output.md entry.md
@@ -59,5 +59,6 @@ And done! Open `output.md` to read the contents of the whole paper.
 
 - [x] Include files from paths
 - [x] Detect and error on cyclic imports
+- [ ] Watch files
 - [ ] Include from git
 - [ ] [YOUR FEATURE HERE] If you're missing a feature, please open an issue and we'll discuss it.
