@@ -55,10 +55,12 @@ docdoc -o output.md entry.md
 
 And done! Open `output.md` to read the contents of the whole paper.
 
+
+
 ## Features
 
 - [x] Include files from paths
 - [x] Detect and error on cyclic imports
-- [ ] Watch files
+- [x] Watch files
 - [ ] Include from git
 - [ ] [YOUR FEATURE HERE] If you're missing a feature, please open an issue and we'll discuss it.
