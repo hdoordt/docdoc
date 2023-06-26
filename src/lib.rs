@@ -25,11 +25,10 @@ impl Format {
     pub fn detect(path: impl AsRef<Path>) -> Option<Self> {
         path.as_ref()
             .extension()
-            .map(|ext| match ext.to_str() {
+            .and_then(|ext| match ext.to_str() {
                 Some("md") => Some(Format::Markdown),
                 Some(_) | None => None,
             })
-            .flatten()
     }
 }
 
@@ -136,14 +135,14 @@ impl<'src> Expr<'src> {
 
                 let included_file = File::open(&absolute_path)?;
                 let included_file = BufReader::new(included_file);
-                let mut lines = included_file.lines();
                 let mut all_touched_paths = touched_paths.clone();
-                while let Some(line) = lines.next() {
+
+                for line in included_file.lines() {
                     let line = line?;
                     let exprs = Expr::parse(&line);
                     for expr in exprs {
                         let touched_paths = expr.eval(
-                            &absolute_path.parent().unwrap(),
+                            absolute_path.parent().unwrap(),
                             output,
                             touched_paths.clone(),
                         )?;
