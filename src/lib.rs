@@ -14,8 +14,6 @@ use regex::Regex;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Format {
-    #[cfg_attr(feature = "clap", value(alias = "adoc"))]
-    Asciidoc,
     #[cfg_attr(feature = "clap", value(alias = "md"))]
     Markdown,
 }
@@ -25,7 +23,6 @@ impl Format {
         path.as_ref()
             .extension()
             .map(|ext| match ext.to_str() {
-                Some("adoc") => Some(Format::Asciidoc),
                 Some("md") => Some(Format::Markdown),
                 Some(_) | None => None,
             })
@@ -33,7 +30,7 @@ impl Format {
     }
 }
 
-pub struct DocDoctor<R, W> {
+pub struct DocDoc<R, W> {
     #[allow(dead_code)]
     format: Format,
     input: R,
@@ -42,7 +39,7 @@ pub struct DocDoctor<R, W> {
     touched_paths: HashSet<PathBuf>,
 }
 
-impl<R, W> DocDoctor<R, W>
+impl<R, W> DocDoc<R, W>
 where
     R: BufRead,
     W: Write,

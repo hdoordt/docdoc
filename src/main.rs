@@ -7,7 +7,7 @@ use std::{
 };
 
 use clap::Parser;
-use docdoctor::{DocDoctor, Format};
+use docdoc::{DocDoc, Format};
 
 #[derive(Parser)]
 struct Args {
@@ -51,7 +51,7 @@ fn main() {
             None => return Err("Could not auto-detect entry document format. Please specify it using the `--format` argument".into()),
         };
 
-        let doctor = DocDoctor::new(doc_format, BufReader::new(entry), output, args.entry);
+        let doctor = DocDoc::new(doc_format, BufReader::new(entry), output, args.entry);
 
         doctor.stitch().map_err(Into::into)
     }
