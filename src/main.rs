@@ -15,12 +15,28 @@ use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 
 #[derive(Parser)]
 struct Args {
+    #[arg(help = "The path of the entry file")]
     entry: PathBuf,
-    #[arg(env, long, short = 'o')]
+    #[arg(
+        env,
+        long,
+        short = 'o',
+        help = "The path of the file to write the output to. Defaults to stdout."
+    )]
     output: Option<PathBuf>,
-    #[arg(env, long, short = 'f')]
+    #[arg(
+        env,
+        long,
+        short = 'f',
+        help = "Specify doc format. DocDoc attempts to guess format if not set."
+    )]
     format: Option<Format>,
-    #[arg(env, long, short = 'w')]
+    #[arg(
+        env,
+        long,
+        short = 'w',
+        help = "Watch doc import tree, starting at entry file."
+    )]
     watch: bool,
 }
 
@@ -32,6 +48,8 @@ fn main() {
             Some(f) => f,
             None => return Err("Could not auto-detect entry document format. Please specify it using the `--format` argument".into()),
         };
+
+        args.watch.then(clear_terminal);
 
         let output = output_writer(args.output.as_ref())?;
         DocDoc::stitch(doc_format, output, &args.entry)?;
@@ -49,9 +67,24 @@ fn main() {
             for result in rx {
                 match result {
                     Ok(events) if events.iter().any(|e| e.kind == DebouncedEventKind::Any) => {
-                        reset_watcher(watcher, &mut import_paths, doc_format, &args.entry)?;
-                        let output = output_writer(args.output.as_ref())?;
-                        DocDoc::stitch(doc_format, output, &args.entry)?;
+                        clear_terminal();
+                        if let Err(e) =
+                            reset_watcher(watcher, &mut import_paths, doc_format, &args.entry)
+                        {
+                            eprintln!("Error resetting watcher: {e}");
+                            continue;
+                        };
+                        let output = match output_writer(args.output.as_ref()) {
+                            Ok(o) => o,
+                            Err(e) => {
+                                eprintln!("Error setting up output writer: {e}");
+                                continue;
+                            }
+                        };
+                        if let Err(e) = DocDoc::stitch(doc_format, output, &args.entry) {
+                            eprintln!("Error stitching together documents: {e}");
+                            continue;
+                        }
                     }
                     Err(errs) => {
                         errs.into_iter()
@@ -88,13 +121,17 @@ fn reset_watcher(
     import_paths: &mut HashSet<PathBuf>,
     doc_format: Format,
     entry_path: impl AsRef<Path>,
-) -> Result<(), Box<dyn StdError>> {
+) -> Result<(), notify::Error> {
     for path in import_paths.iter() {
         watcher.unwatch(path)?;
     }
-    *import_paths = DocDoc::list_imports(doc_format, entry_path)?;
+    *import_paths = DocDoc::list_imports(doc_format, entry_path);
     for path in import_paths.iter() {
         watcher.watch(path, RecursiveMode::NonRecursive)?;
     }
     Ok(())
+}
+
+fn clear_terminal() {
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
 }
