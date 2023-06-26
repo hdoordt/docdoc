@@ -1,9 +1,8 @@
 use std::{
-    borrow::Cow,
     error::Error,
-    fs,
-    io::{self, BufRead, Write},
-    path::{Path, PathBuf},
+    fs::File,
+    io::{self, BufRead, BufReader, Write},
+    path::Path,
 };
 
 use regex::Regex;
@@ -31,6 +30,7 @@ impl Format {
 }
 
 pub struct DocDoctor<R, W, P> {
+    #[allow(dead_code)]
     format: Format,
     input: R,
     output: W,
@@ -57,7 +57,7 @@ where
             let line = line?;
             let exprs = Expr::parse(&line);
             for expr in exprs {
-                writeln!(self.output, "{}", expr.eval(self.base_path.as_ref()))?;
+                expr.eval(&self.base_path, &mut self.output)?;
             }
         }
 
@@ -73,7 +73,6 @@ enum Expr<'src> {
 
 impl<'src> Expr<'src> {
     fn parse(line: &'src str) -> Vec<Self> {
-        // dbg!(line);
         let include_path = Regex::new(r#"\#\[docdoc:path="([^"\#]*)"\]"#).unwrap();
         let matches: Vec<_> = include_path.find_iter(line).collect();
         if matches.is_empty() {
@@ -98,28 +97,25 @@ impl<'src> Expr<'src> {
         exprs
     }
 
-    fn eval(&self, base_path: &Path) -> Cow<'_, str> {
-        use std::fmt::Write;
+    fn eval(&self, base_path: impl AsRef<Path>, output: &mut impl Write) -> io::Result<()> {
         use Expr::*;
         match self {
-            Text(t) => Cow::Borrowed(t),
+            Text(t) => writeln!(output, "{t}"),
             IncludePath(p) => {
-                let base_path = base_path.join(p);
-                let contents = fs::read_to_string(&base_path).unwrap();
-                let mut lines = contents.lines().peekable();
-                let mut rendered = String::new();
+                let absolute_path = base_path.as_ref().join(p);
+                let included_file = File::open(&absolute_path)?;
+                let included_file = BufReader::new(included_file);
+                let mut lines = included_file.lines();
 
                 while let Some(line) = lines.next() {
-                    let exprs = Expr::parse(line);
+                    let line = line?;
+                    let exprs = Expr::parse(&line);
                     for expr in exprs {
-                        rendered.push_str(&expr.eval(&base_path.parent().unwrap()))
-                    }
-                    if lines.peek().is_some() {
-                        writeln!(rendered).unwrap();
+                        expr.eval(&absolute_path.parent().unwrap(), output)?;
                     }
                 }
 
-                Cow::Owned(rendered)
+                Ok(())
             }
         }
     }
