@@ -51,13 +51,13 @@ fn main() {
             None => return Err("Could not auto-detect entry document format. Please specify it using the `--format` argument".into()),
         };
 
-        let doctor = DocDoc::new(doc_format, BufReader::new(entry), output, args.entry);
+        let docdoc = DocDoc::new(doc_format, BufReader::new(entry), output, args.entry);
 
-        doctor.stitch().map_err(Into::into)
+        docdoc.stitch().map_err(Into::into)
     }
 
     if let Err(e) = run() {
-        eprintln!("DocDoctor ended with an error");
+        eprintln!("DocDoc ended with an error");
         eprintln!("{e}");
         exit(1);
     }
