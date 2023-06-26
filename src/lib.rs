@@ -3,7 +3,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
     iter::once,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, sync::OnceLock,
 };
 
 pub mod error;
@@ -82,8 +82,10 @@ enum Expr<'src> {
 
 impl<'src> Expr<'src> {
     fn parse(line: &'src str) -> Vec<Self> {
-        let include_path = Regex::new(r#"\#\[docdoc:path="([^"\#]*)"\]"#).unwrap();
-        let matches: Vec<_> = include_path.find_iter(line).collect();
+        static REGEX: OnceLock<Regex> = OnceLock::new();
+        let include_regex = REGEX.get_or_init(|| Regex::new(r#"\#\[docdoc:path="([^"\#]*)"\]"#).unwrap());
+
+        let matches: Vec<_> = include_regex.find_iter(line).collect();
         if matches.is_empty() {
             return vec![Expr::Text(line)];
         }
