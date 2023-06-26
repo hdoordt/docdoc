@@ -1,9 +1,9 @@
 use std::{
     collections::HashSet,
     fs::File,
-    io::{BufRead, BufReader, Write},
-    iter::once,
-    path::{Path, PathBuf}, sync::OnceLock,
+    io::{sink, BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 pub mod error;
@@ -11,7 +11,7 @@ use error::Error;
 
 use regex::Regex;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Format {
     #[cfg_attr(feature = "clap", value(alias = "md"))]
@@ -30,43 +30,40 @@ impl Format {
     }
 }
 
-pub struct DocDoc<R, W> {
-    #[allow(dead_code)]
-    format: Format,
-    input: R,
-    output: W,
-    base_path: PathBuf,
-    touched_paths: HashSet<PathBuf>,
-}
+pub struct DocDoc;
 
-impl<R, W> DocDoc<R, W>
-where
-    R: BufRead,
-    W: Write,
-{
-    pub fn new(format: Format, input: R, output: W, entry_path: PathBuf) -> Self {
+impl DocDoc {
+    pub fn list_imports(_format: Format, entry_path: PathBuf) -> Result<HashSet<PathBuf>, Error> {
+        let file = File::open(&entry_path)?;
+        let input = BufReader::new(file);
         let base_path = entry_path.parent().unwrap().to_owned();
-        let touched_paths = HashSet::from_iter(once(entry_path));
-
-        Self {
-            format,
-            input,
-            output,
-            base_path,
-            touched_paths,
-        }
-    }
-
-    pub fn stitch(mut self) -> Result<(), Error> {
-        for line in self.input.lines() {
+        let touched_paths = HashSet::from([entry_path]);
+        let mut all_touched_paths = HashSet::new();
+        for line in input.lines() {
             let line = line?;
             let exprs = Expr::parse(&line);
             for expr in exprs {
-                expr.eval(
-                    &self.base_path,
-                    &mut self.output,
-                    self.touched_paths.clone(),
-                )?;
+                let paths = expr.eval(&base_path, &mut sink(), touched_paths.clone())?;
+                all_touched_paths.extend(paths);
+            }
+        }
+        Ok(all_touched_paths)
+    }
+
+    pub fn stitch(
+        _format: Format,
+        mut output: impl Write,
+        entry_path: PathBuf,
+    ) -> Result<(), Error> {
+        let file = File::open(&entry_path)?;
+        let input = BufReader::new(file);
+        let base_path = entry_path.parent().unwrap().to_owned();
+        let touched_paths = HashSet::from([entry_path]);
+        for line in input.lines() {
+            let line = line?;
+            let exprs = Expr::parse(&line);
+            for expr in exprs {
+                expr.eval(&base_path, &mut output, touched_paths.clone())?;
             }
         }
 
@@ -83,7 +80,8 @@ enum Expr<'src> {
 impl<'src> Expr<'src> {
     fn parse(line: &'src str) -> Vec<Self> {
         static REGEX: OnceLock<Regex> = OnceLock::new();
-        let include_regex = REGEX.get_or_init(|| Regex::new(r#"\#\[docdoc:path="([^"\#]*)"\]"#).unwrap());
+        let include_regex =
+            REGEX.get_or_init(|| Regex::new(r#"\#\[docdoc:path="([^"\#]*)"\]"#).unwrap());
 
         let matches: Vec<_> = include_regex.find_iter(line).collect();
         if matches.is_empty() {
@@ -113,10 +111,13 @@ impl<'src> Expr<'src> {
         base_path: impl AsRef<Path>,
         output: &mut impl Write,
         mut touched_paths: HashSet<PathBuf>,
-    ) -> Result<(), Error> {
+    ) -> Result<HashSet<PathBuf>, Error> {
         use Expr::*;
         match self {
-            Text(t) => Ok(writeln!(output, "{t}")?),
+            Text(t) => {
+                writeln!(output, "{t}")?;
+                Ok(touched_paths)
+            }
             IncludePath(p) => {
                 let absolute_path = base_path.as_ref().join(p);
                 if let Some(absolute_path) = touched_paths.replace(absolute_path.canonicalize()?) {
@@ -126,20 +127,21 @@ impl<'src> Expr<'src> {
                 let included_file = File::open(&absolute_path)?;
                 let included_file = BufReader::new(included_file);
                 let mut lines = included_file.lines();
-
+                let mut all_touched_paths = touched_paths.clone();
                 while let Some(line) = lines.next() {
                     let line = line?;
                     let exprs = Expr::parse(&line);
                     for expr in exprs {
-                        expr.eval(
+                        let touched_paths = expr.eval(
                             &absolute_path.parent().unwrap(),
                             output,
                             touched_paths.clone(),
                         )?;
+                        all_touched_paths.extend(touched_paths);
                     }
                 }
 
-                Ok(())
+                Ok(all_touched_paths)
             }
         }
     }
