@@ -35,18 +35,17 @@ impl Format {
 pub enum DocDoc {}
 
 impl DocDoc {
-    /// Traverse the import tree from the entry path, and return a list of all
-    /// paths from which files are imported.
-    pub fn list_imports(
-        _format: Format,
-        entry_path: impl AsRef<Path>,
-    ) -> Result<HashSet<PathBuf>, Error> {
+    /// Traverse the import tree from the entry path as far as possible, and return a list of all
+    /// paths from which files are imported. In case an error traversing the tree occurs, this list
+    /// is possibly incomplete.
+    pub fn list_imports(_format: Format, entry_path: impl AsRef<Path>) -> HashSet<PathBuf> {
         let mut all_touched_paths = HashSet::new();
         Self::traverse(_format, sink(), entry_path, |paths| {
             all_touched_paths.extend(paths);
-        })?;
+        })
+        .ok();
 
-        Ok(all_touched_paths)
+        all_touched_paths
     }
 
     /// Traverse the import tree from the entry path, and render all imports
