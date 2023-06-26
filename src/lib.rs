@@ -41,19 +41,11 @@ impl DocDoc {
         _format: Format,
         entry_path: impl AsRef<Path>,
     ) -> Result<HashSet<PathBuf>, Error> {
-        let file = File::open(&entry_path)?;
-        let input = BufReader::new(file);
-        let base_path = entry_path.as_ref().parent().unwrap().to_owned();
-        let touched_paths = HashSet::from([entry_path.as_ref().to_owned()]);
         let mut all_touched_paths = HashSet::new();
-        for line in input.lines() {
-            let line = line?;
-            let exprs = Expr::parse(&line);
-            for expr in exprs {
-                let paths = expr.eval(&base_path, &mut sink(), touched_paths.clone())?;
-                all_touched_paths.extend(paths);
-            }
-        }
+        Self::traverse(_format, sink(), entry_path, |paths| {
+            all_touched_paths.extend(paths);
+        })?;
+
         Ok(all_touched_paths)
     }
 
@@ -61,21 +53,34 @@ impl DocDoc {
     /// to the passed [Write].
     pub fn stitch(
         _format: Format,
-        mut output: impl Write,
+        output: impl Write,
         entry_path: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        let file = File::open(entry_path.as_ref())?;
+        Self::traverse(_format, output, entry_path, |_| ())
+    }
+
+    fn traverse<F>(
+        _format: Format,
+        mut output: impl Write,
+        entry_path: impl AsRef<Path>,
+        mut func: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(HashSet<PathBuf>),
+    {
+        let file = File::open(&entry_path)?;
         let input = BufReader::new(file);
         let base_path = entry_path.as_ref().parent().unwrap().to_owned();
         let touched_paths = HashSet::from([entry_path.as_ref().to_owned()]);
+
         for line in input.lines() {
             let line = line?;
             let exprs = Expr::parse(&line);
             for expr in exprs {
-                expr.eval(&base_path, &mut output, touched_paths.clone())?;
+                let paths = expr.eval(&base_path, &mut output, touched_paths.clone())?;
+                func(paths);
             }
         }
-
         Ok(())
     }
 }
