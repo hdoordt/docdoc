@@ -32,11 +32,6 @@ fn main() {
             }
         };
 
-        let entry_base_path = match args.entry.parent() {
-            Some(p) => p,
-            None => return Err("Entry file is not within a folder".into()),
-        };
-
         let output: Box<dyn Write> = match &args.output {
             Some(output) => match File::create(&output).or_else(|_| File::open(&output)) {
                 Ok(f) => Box::new(f),
@@ -56,7 +51,7 @@ fn main() {
             None => return Err("Could not auto-detect entry document format. Please specify it using the `--format` argument".into()),
         };
 
-        let doctor = DocDoctor::new(doc_format, BufReader::new(entry), output, entry_base_path);
+        let doctor = DocDoctor::new(doc_format, BufReader::new(entry), output, args.entry);
 
         doctor.stitch().map_err(Into::into)
     }

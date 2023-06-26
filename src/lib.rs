@@ -1,9 +1,13 @@
 use std::{
-    error::Error,
+    collections::HashSet,
     fs::File,
-    io::{self, BufRead, BufReader, Write},
-    path::Path,
+    io::{BufRead, BufReader, Write},
+    iter::once,
+    path::{Path, PathBuf},
 };
+
+pub mod error;
+use error::Error;
 
 use regex::Regex;
 
@@ -29,35 +33,43 @@ impl Format {
     }
 }
 
-pub struct DocDoctor<R, W, P> {
+pub struct DocDoctor<R, W> {
     #[allow(dead_code)]
     format: Format,
     input: R,
     output: W,
-    base_path: P,
+    base_path: PathBuf,
+    touched_paths: HashSet<PathBuf>,
 }
 
-impl<R, W, P> DocDoctor<R, W, P>
+impl<R, W> DocDoctor<R, W>
 where
     R: BufRead,
     W: Write,
-    P: AsRef<Path>,
 {
-    pub fn new(format: Format, input: R, output: W, base_path: P) -> Self {
+    pub fn new(format: Format, input: R, output: W, entry_path: PathBuf) -> Self {
+        let base_path = entry_path.parent().unwrap().to_owned();
+        let touched_paths = HashSet::from_iter(once(entry_path));
+
         Self {
             format,
             input,
             output,
             base_path,
+            touched_paths,
         }
     }
 
-    pub fn stitch(mut self) -> Result<(), Box<dyn Error>> {
+    pub fn stitch(mut self) -> Result<(), Error> {
         for line in self.input.lines() {
             let line = line?;
             let exprs = Expr::parse(&line);
             for expr in exprs {
-                expr.eval(&self.base_path, &mut self.output)?;
+                expr.eval(
+                    &self.base_path,
+                    &mut self.output,
+                    self.touched_paths.clone(),
+                )?;
             }
         }
 
@@ -97,12 +109,21 @@ impl<'src> Expr<'src> {
         exprs
     }
 
-    fn eval(&self, base_path: impl AsRef<Path>, output: &mut impl Write) -> io::Result<()> {
+    fn eval(
+        &self,
+        base_path: impl AsRef<Path>,
+        output: &mut impl Write,
+        mut touched_paths: HashSet<PathBuf>,
+    ) -> Result<(), Error> {
         use Expr::*;
         match self {
-            Text(t) => writeln!(output, "{t}"),
+            Text(t) => Ok(writeln!(output, "{t}")?),
             IncludePath(p) => {
                 let absolute_path = base_path.as_ref().join(p);
+                if let Some(absolute_path) = touched_paths.replace(absolute_path.canonicalize()?) {
+                    return Err(Error::ImportCycle(absolute_path));
+                }
+
                 let included_file = File::open(&absolute_path)?;
                 let included_file = BufReader::new(included_file);
                 let mut lines = included_file.lines();
@@ -111,7 +132,11 @@ impl<'src> Expr<'src> {
                     let line = line?;
                     let exprs = Expr::parse(&line);
                     for expr in exprs {
-                        expr.eval(&absolute_path.parent().unwrap(), output)?;
+                        expr.eval(
+                            &absolute_path.parent().unwrap(),
+                            output,
+                            touched_paths.clone(),
+                        )?;
                     }
                 }
 
