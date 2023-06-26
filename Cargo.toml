@@ -9,6 +9,7 @@ categories = ["command-line-utilities", "template-engine"]
 readme = "./README.md"
 repository = "https://github.com/hdoordt/docdoc"
 documentation = "https://docs.rs/docdoc"
+exclude = ["tests/data"]
 
 [dependencies]
 clap = { optional = true, version = "4.3.5", features = ["derive", "env"] }
