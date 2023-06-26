@@ -4,7 +4,7 @@ use std::{
     fs::File,
     io::{self, stdout, Write},
     path::{Path, PathBuf},
-    process::exit,
+    process::{exit, Child, Command},
     time::Duration,
 };
 
@@ -38,12 +38,27 @@ struct Args {
         help = "Watch doc import tree, starting at entry file."
     )]
     watch: bool,
+
+    #[arg(
+        env,
+        long,
+        short = 'x',
+        help = "The command to execute after rendering is done. If watching is enabled, the command is killed on each render."
+    )]
+    exec: Option<String>,
+
+    #[arg(
+        env,
+        long,
+        short = 's',
+        help = "The command to spawn after the first time rendering is done. Will only be killed once DocDoc finishes."
+    )]
+    spawn: Option<String>,
 }
 
 fn main() {
     fn run() -> Result<(), Box<dyn StdError>> {
         let args = Args::parse();
-
         let doc_format = match args.format.or_else(|| Format::detect(&args.entry)) {
             Some(f) => f,
             None => return Err("Could not auto-detect entry document format. Please specify it using the `--format` argument".into()),
@@ -54,19 +69,24 @@ fn main() {
         let output = output_writer(args.output.as_ref())?;
         DocDoc::stitch(doc_format, output, &args.entry)?;
 
+        let mut child = args.exec.as_ref().map(|e| exec_command(e).unwrap());
+        args.spawn.as_ref().map(|s| exec_command(s));
+
         if args.watch {
             let (tx, rx) = std::sync::mpsc::channel();
             let mut debouncer = new_debouncer(Duration::from_millis(100), None, tx)?;
 
-            let watcher = debouncer.watcher();
-
             let mut import_paths = HashSet::new();
-
+            let watcher = debouncer.watcher();
             reset_watcher(watcher, &mut import_paths, doc_format, &args.entry)?;
 
             for result in rx {
                 match result {
                     Ok(events) if events.iter().any(|e| e.kind == DebouncedEventKind::Any) => {
+                        child = child.take().map(|mut c| {
+                            c.kill().unwrap();
+                            exec_command(args.exec.as_ref().unwrap()).unwrap()
+                        });
                         clear_terminal();
                         if let Err(e) =
                             reset_watcher(watcher, &mut import_paths, doc_format, &args.entry)
@@ -134,4 +154,10 @@ fn reset_watcher(
 
 fn clear_terminal() {
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+}
+
+fn exec_command(cmd: &str) -> io::Result<Child> {
+    let mut parts = cmd.split_ascii_whitespace();
+    let cmd = Command::new(parts.next().unwrap()).args(parts).spawn()?;
+    Ok(cmd)
 }
