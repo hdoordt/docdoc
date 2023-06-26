@@ -2,9 +2,9 @@
 
 [![crates.io](https://img.shields.io/crates/v/docdoc.svg)](https://crates.io/crates/docdoc) [![Documentation](https://docs.rs/docdoc/badge.svg)](https://docs.rs/docdoc)
 
-Simple tool that stiches together a tree of text-based files. Currently only supports markdown.
+Simple tool that stitches together a tree of text-based files. Currently only supports markdown.
 
-Why? I couln't find an easy to use and install tool to stich together my markdown files. And because it's fun, of course!
+Why? I couln't find an easy to use and install tool to stitch together my markdown files. And because it's fun, of course!
 
 ## Installation
 You'll need Rust and Cargo to build or install this tool.
@@ -47,7 +47,7 @@ And then `conclusion.md`:
 So yeah, that was it. I had fun!
 ```
 
-Now, lets have DocDoc stich this together:
+Now, lets have DocDoc stitch this together:
 
 ```
 docdoc -o output.md entry.md
