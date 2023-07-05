@@ -1,7 +1,7 @@
 [package]
 name = "docdoc"
 description = "Simple tool that stitches together a tree of text-based files"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 authors = ["Henk Oordt <hd@oordt.dev>"]
 license = "MIT OR Apache-2.0"
